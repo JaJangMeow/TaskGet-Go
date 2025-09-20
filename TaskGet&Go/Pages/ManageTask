@@ -1,0 +1,246 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Task } from '@/entities/Task';
+import { TaskApplication } from '@/entities/TaskApplication';
+import { User } from '@/entities/User';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { ArrowLeft, Check, X, MessageSquare, BadgeCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import ApplicantCard from '../components/manage/ApplicantCard';
+
+export default function ManageTask() {
+    const navigate = useNavigate();
+    const [task, setTask] = useState(null);
+    const [applications, setApplications] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+
+    const getTaskId = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('id');
+    };
+
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        const taskId = getTaskId();
+        if (!taskId) {
+            navigate(createPageUrl('MyTasks'));
+            return;
+        }
+
+        try {
+            const [userData, taskData] = await Promise.all([
+                User.me(),
+                Task.filter({ id: taskId }),
+            ]);
+            
+            if (taskData.length === 0 || taskData[0].created_by !== userData.email) {
+                navigate(createPageUrl('MyTasks'));
+                return;
+            }
+
+            setUser(userData);
+            setTask(taskData[0]);
+
+            const applicationsData = await TaskApplication.filter(
+                { task_id: taskId },
+                '-created_date'
+            );
+            setApplications(applicationsData);
+        } catch (error) {
+            console.error('Error loading task management data:', error);
+            navigate(createPageUrl('MyTasks'));
+        } finally {
+            setLoading(false);
+        }
+    }, [navigate]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const handleAccept = async (application) => {
+        const confirmAccept = window.confirm(`Are you sure you want to accept ${application.applicant_name}? This will reject all other applicants.`);
+        if (!confirmAccept) return;
+
+        try {
+            // 1. Update Task status and accepted applicant details
+            await Task.update(task.id, {
+                status: 'in_progress',
+                accepted_applicant_email: application.applicant_email,
+                accepted_applicant_name: application.applicant_name,
+            });
+
+            // 2. Update accepted application status
+            await TaskApplication.update(application.id, { status: 'accepted' });
+
+            // 3. Reject all other pending applications
+            const otherApplications = applications.filter(
+                (app) => app.id !== application.id && app.status === 'pending'
+            );
+            
+            await Promise.all(
+                otherApplications.map(app => TaskApplication.update(app.id, { status: 'rejected' }))
+            );
+            
+            // Reload data to reflect changes
+            loadData();
+        } catch (error) {
+            console.error("Failed to accept application:", error);
+            alert("An error occurred. Please try again.");
+        }
+    };
+    
+    const handleDecline = async (applicationId) => {
+        try {
+            await TaskApplication.update(applicationId, { status: 'rejected' });
+            loadData();
+        } catch (error) {
+            console.error("Failed to decline application:", error);
+            alert("An error occurred. Please try again.");
+        }
+    };
+
+    const handleMarkComplete = async () => {
+        const confirmComplete = window.confirm("Are you sure you want to mark this task as complete? This action cannot be undone.");
+        if (!confirmComplete) return;
+
+        try {
+            await Task.update(task.id, { status: 'completed' });
+            loadData();
+        } catch (error) {
+            console.error("Failed to complete task:", error);
+            alert("An error occurred. Please try again.");
+        }
+    };
+    
+    const openChat = () => {
+        navigate(createPageUrl(`Chat?task_id=${task.id}&recipient_email=${task.accepted_applicant_email}&recipient_name=${encodeURIComponent(task.accepted_applicant_name)}`));
+    };
+
+    if (loading) {
+        return <div className="text-center p-8">Loading...</div>;
+    }
+
+    if (!task) {
+        return <div className="text-center p-8">Task not found.</div>;
+    }
+
+    const acceptedApplication = applications.find(app => app.status === 'accepted');
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigate(createPageUrl("MyTasks"))}
+                    className="bg-white"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div>
+                    <h1 className="text-2xl font-bold text-app-midnight">Manage Task</h1>
+                    <p className="text-sm text-app-stone">{task.title}</p>
+                </div>
+            </div>
+
+            {/* Task Status Section */}
+            <div className="mobile-card p-4">
+                <h3 className="font-semibold text-app-midnight mb-2">
+                    Task Status: <span className={`capitalize ${
+                        task.status === 'open' ? 'text-green-600' :
+                        task.status === 'in_progress' ? 'text-blue-600' :
+                        task.status === 'awaiting_verification' ? 'text-yellow-600' :
+                        task.status === 'payment_pending' ? 'text-orange-600' :
+                        task.status === 'completed' ? 'text-purple-600' :
+                        'text-app-stone'
+                    }`}>
+                        {task.status.replace("_", " ")}
+                    </span>
+                </h3>
+                <div className="flex items-center text-sm text-app-stone">
+                    <p>Posted on {format(new Date(task.created_date), 'MMM d, yyyy')}</p>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            {task.status === 'open' && (
+                <div>
+                    <h3 className="text-lg font-semibold text-app-midnight mb-4">
+                        Applicants ({applications.filter(a => a.status === 'pending').length})
+                    </h3>
+                    {applications.filter(a => a.status === 'pending').length > 0 ? (
+                        <div className="space-y-4">
+                            {applications.filter(a => a.status === 'pending').map(app => (
+                                <ApplicantCard 
+                                    key={app.id} 
+                                    application={app}
+                                    task={task}
+                                    onAccept={handleAccept}
+                                    onDecline={handleDecline}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center mobile-card p-8">
+                            <p className="text-app-stone">No new applicants yet. Check back soon!</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {(task.status === 'in_progress' || task.status === 'awaiting_verification' || task.status === 'payment_pending') && acceptedApplication && (
+                <div className="mobile-card p-6 text-center space-y-4">
+                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                        <BadgeCheck className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-app-midnight">
+                        {task.status === 'in_progress' ? 'Task in Progress!' :
+                         task.status === 'awaiting_verification' ? 'Awaiting Your Verification' :
+                         'Payment Pending'}
+                    </h3>
+                    <p className="text-app-stone">
+                        {task.status === 'in_progress' && 
+                            `You have accepted ${task.accepted_applicant_name} to complete this task.`
+                        }
+                        {task.status === 'awaiting_verification' && 
+                            `${task.accepted_applicant_name} has marked the task as complete. Please verify and process payment.`
+                        }
+                        {task.status === 'payment_pending' && 
+                            `Task completion verified. Complete the payment to ${task.accepted_applicant_name}.`
+                        }
+                    </p>
+                    <Button onClick={openChat} className="w-full mobile-button">
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Open Chat
+                    </Button>
+                </div>
+            )}
+            
+            {task.status === 'completed' && (
+                 <div className="mobile-card p-6 text-center space-y-4">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                        <Check className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-app-midnight">Task Completed!</h3>
+                    <p className="text-app-stone">
+                        This task was successfully completed by <span className="font-bold">{task.accepted_applicant_name}</span> and payment has been processed.
+                    </p>
+                    {task.payment_method && task.payment_reference && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p className="text-sm text-green-800">
+                                <strong>Payment:</strong> ₹{task.payment_amount} via {task.payment_method.toUpperCase()}
+                            </p>
+                            <p className="text-xs text-green-600">
+                                Transaction ID: {task.payment_reference}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+        </div>
+    );
+}

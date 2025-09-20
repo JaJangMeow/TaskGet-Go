@@ -1,0 +1,373 @@
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Task } from "@/entities/Task";
+import { User } from "@/entities/User";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import TaskCard from "../components/dashboard/TaskCard";
+import TaskFilters from "../components/dashboard/TaskFilters";
+import StatsSection from "../components/dashboard/StatsSection";
+import ViewToggle from "../components/dashboard/ViewToggle";
+import SortButton from "../components/dashboard/SortButton";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus } from "lucide-react"; // Added import for Plus icon
+import { Button } from "@/components/ui/button"; // Added import for Button component
+
+export default function Dashboard() {
+    const [tasks, setTasks] = useState([]);
+    const [processedTasks, setProcessedTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [userLocation, setUserLocation] = useState(null);
+    const [viewMode, setViewMode] = useState("list"); // "list" or "grid"
+    const [filters, setFilters] = useState({
+        category: "all",
+        priceRange: "all",
+        location: "",
+        search: "",
+        dateRange: "all",
+        duration: "all",
+        distance: "all",
+        priority: "all",
+        sortBy: "newest"
+    });
+
+    // Calculate distance between two coordinates using Haversine formula
+    const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Radius of the Earth in kilometers
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c; // Distance in km
+        return distance;
+    }, []);
+
+    // Format distance for display
+    const formatDistance = useCallback((distanceKm) => {
+        if (distanceKm < 0.1) return "100 m"; // Minimum 100m
+        if (distanceKm > 50) return "50+ km"; // Maximum 50km
+        if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
+        return `${distanceKm.toFixed(1)} km`;
+    }, []);
+
+    const processTasks = useCallback(() => {
+        let processed = tasks.map(task => {
+            let distance = null;
+            if (userLocation && task.latitude && task.longitude) {
+                distance = calculateDistance(
+                    userLocation.latitude, 
+                    userLocation.longitude, 
+                    task.latitude, 
+                    task.longitude
+                );
+            }
+            return { ...task, distance, formattedDistance: distance ? formatDistance(distance) : null };
+        });
+
+        // Filtering
+        if (filters.category !== "all") {
+            processed = processed.filter(task => {
+                if (Array.isArray(task.categories)) {
+                    return task.categories.includes(filters.category);
+                }
+                return task.category === filters.category;
+            });
+        }
+
+        if (filters.search) {
+            const searchLower = filters.search.toLowerCase();
+            processed = processed.filter(task =>
+                task.title.toLowerCase().includes(searchLower) ||
+                task.description.toLowerCase().includes(searchLower) ||
+                task.location.toLowerCase().includes(searchLower)
+            );
+        }
+
+        if (filters.priceRange !== "all") {
+            processed = processed.filter(task => {
+                const price = task.payment_amount;
+                switch (filters.priceRange) {
+                    case "under_500": return price < 500;
+                    case "500_1500": return price >= 500 && price <= 1500;
+                    case "1500_5000": return price >= 1500 && price <= 5000;
+                    case "above_5000": return price > 5000;
+                    default: return true;
+                }
+            });
+        }
+
+        // Date filtering
+        if (filters.dateRange !== "all") {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            const weekFromNow = new Date(today);
+            weekFromNow.setDate(weekFromNow.getDate() + 7);
+            const weekStr = weekFromNow.toISOString().split('T')[0];
+
+            processed = processed.filter(task => {
+                if (!task.deadline) return filters.dateRange === "no_deadline";
+                const deadlineStr = task.deadline;
+                
+                switch (filters.dateRange) {
+                    case "today": return deadlineStr === todayStr;
+                    case "tomorrow": return deadlineStr === tomorrowStr;
+                    case "this_week": return deadlineStr >= todayStr && deadlineStr <= weekStr;
+                    case "no_deadline": return !task.deadline;
+                    default: return true;
+                }
+            });
+        }
+
+        // Duration filtering
+        if (filters.duration !== "all" && userLocation) {
+            processed = processed.filter(task => {
+                const duration = task.estimated_duration;
+                if (!duration) return false;
+                
+                const durationLower = duration.toLowerCase();
+                switch (filters.duration) {
+                    case "under_1h": return durationLower.includes("min") || durationLower.includes("30");
+                    case "1_3h": return durationLower.includes("1") || durationLower.includes("2") || durationLower.includes("3");
+                    case "3_6h": return durationLower.includes("3") || durationLower.includes("4") || durationLower.includes("5") || durationLower.includes("6");
+                    case "over_6h": return durationLower.includes("6") || durationLower.includes("7") || durationLower.includes("8") || durationLower.includes("day");
+                    default: return true;
+                }
+            });
+        }
+
+        // Distance filtering
+        if (filters.distance !== "all" && userLocation) {
+            processed = processed.filter(task => {
+                if (!task.distance) return false;
+                switch (filters.distance) {
+                    case "100m": return task.distance <= 0.1;
+                    case "500m": return task.distance <= 0.5;
+                    case "1km": return task.distance <= 1;
+                    case "5km": return task.distance <= 5;
+                    case "10km": return task.distance <= 10;
+                    case "50km": return task.distance <= 50;
+                    default: return true;
+                }
+            });
+        }
+
+        // Priority filtering
+        if (filters.priority !== "all") {
+            processed = processed.filter(task => task.priority === filters.priority);
+        }
+
+        // Sorting
+        switch (filters.sortBy) {
+            case "payment_high":
+                processed.sort((a, b) => b.payment_amount - a.payment_amount);
+                break;
+            case "payment_low":
+                processed.sort((a, b) => a.payment_amount - b.payment_amount);
+                break;
+            case "distance_near":
+                processed.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+                break;
+            case "distance_far":
+                processed.sort((a, b) => (b.distance || 0) - (a.distance || 0));
+                break;
+            case "duration_short":
+                processed.sort((a, b) => {
+                    const getDurationMinutes = (dur) => {
+                        if (!dur) return Infinity;
+                        const durLower = dur.toLowerCase();
+                        if (durLower.includes("min")) {
+                            const match = durLower.match(/(\d+)/);
+                            return match ? parseInt(match[1]) : 60;
+                        }
+                        if (durLower.includes("hour") || durLower.includes("hr")) {
+                            const match = durLower.match(/(\d+)/);
+                            return match ? parseInt(match[1]) * 60 : 120;
+                        }
+                        return 120; // Default 2 hours
+                    };
+                    return getDurationMinutes(a.estimated_duration) - getDurationMinutes(b.estimated_duration);
+                });
+                break;
+            case "duration_long":
+                processed.sort((a, b) => {
+                    const getDurationMinutes = (dur) => {
+                        if (!dur) return 0;
+                        const durLower = dur.toLowerCase();
+                        if (durLower.includes("min")) {
+                            const match = durLower.match(/(\d+)/);
+                            return match ? parseInt(match[1]) : 60;
+                        }
+                        if (durLower.includes("hour") || durLower.includes("hr")) {
+                            const match = durLower.match(/(\d+)/);
+                            return match ? parseInt(match[1]) * 60 : 120;
+                        }
+                        return 120; // Default 2 hours
+                    };
+                    return getDurationMinutes(b.estimated_duration) - getDurationMinutes(a.estimated_duration);
+                });
+                break;
+            case "deadline_soon":
+                processed.sort((a, b) => {
+                    if (!a.deadline && !b.deadline) return 0;
+                    if (!a.deadline) return 1;
+                    if (!b.deadline) return -1;
+                    return new Date(a.deadline) - new Date(b.deadline);
+                });
+                break;
+            case "newest":
+            default:
+                processed.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+                break;
+        }
+
+        setProcessedTasks(processed);
+    }, [tasks, filters, userLocation, calculateDistance, formatDistance]);
+
+    useEffect(() => {
+        loadData();
+        getUserLocation();
+    }, []);
+
+    useEffect(() => {
+        processTasks();
+    }, [processTasks]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [tasksData, userData] = await Promise.all([
+                Task.filter({ status: "open" }, "-created_date"),
+                User.me().catch(() => null)
+            ]);
+            setTasks(tasksData);
+            setUser(userData);
+        } catch (error) {
+            console.error("Error loading data:", error);
+        }
+        setLoading(false);
+    };
+
+    const getUserLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    console.log("Location access denied or unavailable");
+                }
+            );
+        }
+    };
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+        >
+            {/* Hero Section */}
+            <div className="text-center py-2">
+                <div className="inline-flex items-center gap-2 bg-app-orange/10 text-app-orange px-3 py-1 rounded-full text-sm font-medium mb-3">
+                    <div className="w-2 h-2 bg-app-orange rounded-full animate-pulse"></div>
+                    Find tasks near you
+                </div>
+                <h1 className="text-2xl font-bold text-app-midnight mb-2">
+                    Discover Tasks & Earn Money
+                </h1>
+                <p className="text-app-stone text-sm leading-relaxed">
+                    Browse tasks, apply to help others, and get paid
+                </p>
+            </div>
+
+            <StatsSection totalTasks={tasks.length} loading={loading} />
+
+            {/* Filters */}
+            <TaskFilters filters={filters} onFilterChange={setFilters} userLocation={userLocation} />
+
+            {/* View Controls */}
+            <div className="flex justify-between items-center">
+                <h2 className="text-lg font-bold text-app-midnight">
+                    Available Tasks ({processedTasks.length})
+                </h2>
+                <div className="flex items-center gap-2">
+                    <SortButton filters={filters} onFilterChange={setFilters} />
+                    <ViewToggle viewMode={viewMode} onViewChange={setViewMode} />
+                    {/* Added a Post Task button for UI Navigation */}
+                    <Button asChild className="p-2 h-auto text-app-midnight bg-transparent hover:bg-app-grey/20">
+                        <Link to={createPageUrl("PostTask")} title="Post a new task">
+                            <Plus className="w-5 h-5" />
+                            <span className="sr-only">Post a new task</span>
+                        </Link>
+                    </Button>
+                </div>
+            </div>
+
+            {/* Tasks Section */}
+            <div className="space-y-4">
+                {loading ? (
+                    <div className="space-y-4">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className="mobile-card p-4 animate-pulse">
+                                <div className="h-4 bg-app-grey rounded w-3/4 mb-3"></div>
+                                <div className="space-y-2 mb-3">
+                                    <div className="h-3 bg-app-grey rounded"></div>
+                                    <div className="h-3 bg-app-grey rounded w-2/3"></div>
+                                </div>
+                                <div className="h-6 bg-app-grey rounded w-1/3"></div>
+                            </div>
+                        ))}
+                    </div>
+                ) : processedTasks.length === 0 ? (
+                    <div className="mobile-card p-8 text-center">
+                        <div className="w-12 h-12 bg-app-grey/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-6 h-6 text-app-stone" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-app-midnight mb-2">No tasks found</h3>
+                        <p className="text-app-stone text-sm mb-4">Try adjusting your filters or check back later</p>
+                        <Link
+                            to={createPageUrl("PostTask")}
+                            className="mobile-button inline-flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium"
+                        >
+                            Post the first task
+                        </Link>
+                    </div>
+                ) : (
+                    <motion.div 
+                        layout
+                        className={
+                            viewMode === "grid" 
+                                ? "grid grid-cols-2 gap-3" 
+                                : "space-y-3"
+                        }
+                    >
+                        <AnimatePresence>
+                            {processedTasks.map((task) => (
+                                <TaskCard 
+                                    key={task.id} 
+                                    task={task} 
+                                    currentUser={user} 
+                                    viewMode={viewMode}
+                                    userLocation={userLocation}
+                                />
+                            ))}
+                        </AnimatePresence>
+                    </motion.div>
+                )}
+            </div>
+        </motion.div>
+    );
+}

@@ -1,0 +1,135 @@
+import React from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { format, formatDistanceToNow } from "date-fns";
+import { 
+    MapPin, 
+    Calendar, 
+    Clock, 
+    IndianRupee, 
+    User,
+    FileText,
+    Phone,
+    CheckCircle,
+    Camera
+} from "lucide-react";
+
+const categoryIcons = {
+    // ... (omitting for brevity, no changes)
+};
+
+export default function TaskDetailCard({ task }) {
+    if (!task) {
+        return (
+            <div className="mobile-card p-8 text-center">
+                <h2 className="text-xl font-semibold text-app-stone">Task not found</h2>
+                <p className="text-app-stone">The requested task could not be loaded.</p>
+            </div>
+        );
+    }
+    
+    const category = Array.isArray(task.categories) && task.categories.length > 0
+        ? task.categories[0]
+        : task.category || 'General';
+
+    return (
+        <div className="mobile-card p-4 sm:p-6 space-y-6">
+            {/* Header */}
+            <div>
+                 <div className="flex items-center justify-between mb-4">
+                    <Badge 
+                        variant="secondary" 
+                        className="bg-app-orange/10 text-app-orange border-app-orange/20 font-medium"
+                    >
+                        {category}
+                    </Badge>
+                     <Badge 
+                        variant="secondary" 
+                        className="capitalize bg-green-100 text-green-800 border-green-200 font-medium"
+                    >
+                        {task.status?.replace("_", " ") || 'Open'}
+                    </Badge>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold text-app-midnight">
+                    {task.title}
+                </h2>
+                 <p className="text-sm text-app-stone mt-1">
+                    Posted {task.created_date ? formatDistanceToNow(new Date(task.created_date)) : ''} ago
+                </p>
+            </div>
+
+            {/* Payment & Duration */}
+             <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-green-800">
+                    <IndianRupee className="w-6 h-6" />
+                    <span className="font-bold text-2xl">₹{task.payment_amount}</span>
+                    {task.negotiable && <Badge variant="outline" className="text-xs">Negotiable</Badge>}
+                </div>
+            </div>
+
+            {/* Description */}
+            <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-app-midnight mb-2">
+                    <FileText className="w-5 h-5 text-app-orange" />
+                    Description
+                </h3>
+                <p className="text-app-stone leading-relaxed bg-app-silver/50 p-4 rounded-lg">
+                    {task.description}
+                </p>
+            </div>
+
+            {/* Key Details */}
+            <div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-app-stone mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm text-app-stone">Location</p>
+                            <p className="font-medium text-app-midnight">{task.location}</p>
+                        </div>
+                    </div>
+
+                    {task.deadline && (
+                        <div className="flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-app-stone mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="text-sm text-app-stone">Deadline</p>
+                                <p className="font-medium text-app-midnight">
+                                    {format(new Date(task.deadline), "MMM d, yyyy")}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    
+                     {task.estimated_duration && (
+                        <div className="flex items-start gap-3">
+                            <Clock className="w-5 h-5 text-app-stone mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="text-sm text-app-stone">Duration</p>
+                                <p className="font-medium text-app-midnight">{task.estimated_duration}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Media */}
+            {(task.images?.length > 0 || task.video) && (
+                <div>
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-app-midnight mb-3">
+                        <Camera className="w-5 h-5 text-app-orange" />
+                        Media
+                    </h3>
+                    <div className="flex gap-2 overflow-x-auto">
+                        {task.images?.map((img, i) => (
+                            <img key={i} src={img} alt={`task-media-${i}`} className="h-24 w-24 object-cover rounded-lg border border-app-grey" />
+                        ))}
+                        {task.video && (
+                             <video src={task.video} controls className="h-24 w-40 object-cover rounded-lg border border-app-grey bg-app-midnight" />
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

@@ -1,0 +1,221 @@
+
+import React, { useState } from "react";
+import { User } from "@/entities/User"; // Added this import
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+    Send, 
+    CheckCircle, 
+    IndianRupee, 
+    Phone,
+    LogIn
+} from "lucide-react";
+
+export default function ApplicationForm({ 
+    task, 
+    user, 
+    hasApplied, 
+    showForm, 
+    onShowForm, 
+    onSubmit 
+}) {
+    const [formData, setFormData] = useState({
+        message: "",
+        proposed_rate: task.payment_amount,
+        contact_info: ""
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!formData.message.trim() || !formData.contact_info.trim()) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        setIsSubmitting(true);
+        await onSubmit(formData);
+        setIsSubmitting(false);
+    };
+
+    // Not logged in
+    if (!user) {
+        return (
+            <div className="material-card p-6">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <LogIn className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        Login Required
+                    </h3>
+                    <p className="text-slate-600 mb-4">
+                        Please login to apply for this task
+                    </p>
+                    <Button
+                        onClick={() => User.login()}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                        Login to Apply
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    // Already applied
+    if (hasApplied) {
+        return (
+            <div className="material-card p-6">
+                <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        Application Submitted
+                    </h3>
+                    <p className="text-slate-600">
+                        You have already applied for this task. The task poster will contact you if you're selected.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show application form
+    if (showForm) {
+        return (
+            <Card className="material-card">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Send className="w-5 h-5 text-blue-600" />
+                        Apply for Task
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Message */}
+                        <div className="space-y-2">
+                            <Label htmlFor="message" className="text-sm font-medium text-slate-700">
+                                Why are you the right person for this task? *
+                            </Label>
+                            <Textarea
+                                id="message"
+                                placeholder="Tell the task poster about your experience and why you're perfect for this job..."
+                                value={formData.message}
+                                onChange={(e) => setFormData(prev => ({
+                                    ...prev,
+                                    message: e.target.value
+                                }))}
+                                rows={4}
+                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        {/* Proposed Rate */}
+                        <div className="space-y-2">
+                            <Label htmlFor="proposed_rate" className="text-sm font-medium text-slate-700">
+                                Your Rate (₹)
+                            </Label>
+                            <div className="relative">
+                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input
+                                    id="proposed_rate"
+                                    type="number"
+                                    value={formData.proposed_rate}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        proposed_rate: parseFloat(e.target.value)
+                                    }))}
+                                    className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                You can propose a different rate if needed
+                            </p>
+                        </div>
+
+                        {/* Contact Info */}
+                        <div className="space-y-2">
+                            <Label htmlFor="contact_info" className="text-sm font-medium text-slate-700">
+                                Your Contact Information *
+                            </Label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                <Textarea
+                                    id="contact_info"
+                                    placeholder="Phone number, email, or preferred contact method..."
+                                    value={formData.contact_info}
+                                    onChange={(e) => setFormData(prev => ({
+                                        ...prev,
+                                        contact_info: e.target.value
+                                    }))}
+                                    rows={2}
+                                    className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onShowForm(false)}
+                                className="flex-1"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="flex-1 material-button bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Applying...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="w-4 h-4 mr-2" />
+                                        Apply Now
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Show apply button
+    return (
+        <div className="material-card p-6">
+            <div className="text-center space-y-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                    <Send className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                        Interested in this task?
+                    </h3>
+                    <p className="text-slate-600 text-sm">
+                        Apply now to connect with the task poster
+                    </p>
+                </div>
+                <Button
+                    onClick={() => onShowForm(true)}
+                    className="w-full material-button bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300"
+                >
+                    <Send className="w-4 h-4 mr-2" />
+                    Apply for Task
+                </Button>
+            </div>
+        </div>
+    );
+}

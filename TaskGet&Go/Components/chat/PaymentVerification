@@ -1,0 +1,234 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { X, Smartphone, CreditCard, Check } from 'lucide-react';
+
+export default function PaymentVerification({ task, onPaymentComplete, onCancel }) {
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [upiId, setUpiId] = useState('');
+    const [transactionId, setTransactionId] = useState('');
+    const [step, setStep] = useState(1); // 1: Select method, 2: Payment details, 3: Confirmation
+    const [processing, setProcessing] = useState(false);
+
+    const paymentMethods = [
+        { value: 'gpay', label: 'Google Pay', icon: '🟢' },
+        { value: 'paytm', label: 'Paytm', icon: '🔵' },
+        { value: 'phonepe', label: 'PhonePe', icon: '🟣' },
+        { value: 'upi', label: 'Other UPI', icon: '💳' }
+    ];
+
+    const generateUPILink = () => {
+        if (!upiId || !paymentMethod) return '';
+        
+        const amount = task.payment_amount;
+        const note = `Payment for task: ${task.title}`;
+        
+        return `upi://pay?pa=${upiId}&pn=${task.accepted_applicant_name}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+    };
+
+    const handleProceedToPayment = () => {
+        if (!paymentMethod) {
+            alert('Please select a payment method.');
+            return;
+        }
+        setStep(2);
+    };
+
+    const handleOpenUPI = () => {
+        if (!upiId) {
+            alert('Please enter the tasker\'s UPI ID.');
+            return;
+        }
+        
+        const upiLink = generateUPILink();
+        window.location.href = upiLink;
+        setStep(3);
+    };
+
+    const handleConfirmPayment = async () => {
+        if (!transactionId.trim()) {
+            alert('Please enter the transaction ID.');
+            return;
+        }
+
+        setProcessing(true);
+        await onPaymentComplete({
+            method: paymentMethod,
+            reference: transactionId.trim(),
+            upi_id: upiId
+        });
+        setProcessing(false);
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+        >
+            <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-xl p-6 w-full max-w-md"
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-app-midnight">Complete Payment</h2>
+                    <Button variant="ghost" size="icon" onClick={onCancel}>
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
+
+                {/* Step 1: Select Payment Method */}
+                {step === 1 && (
+                    <div className="space-y-4">
+                        <div className="bg-app-silver/30 p-4 rounded-lg">
+                            <h3 className="font-medium text-app-midnight mb-2">Payment Details</h3>
+                            <div className="text-sm text-app-stone space-y-1">
+                                <p>Task: {task.title}</p>
+                                <p>Tasker: {task.accepted_applicant_name}</p>
+                                <p className="text-lg font-bold text-app-midnight">Amount: ₹{task.payment_amount}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Select Payment Method</Label>
+                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                <SelectTrigger className="border-app-grey focus:ring-app-orange">
+                                    <SelectValue placeholder="Choose UPI payment method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.map((method) => (
+                                        <SelectItem key={method.value} value={method.value}>
+                                            <div className="flex items-center gap-2">
+                                                <span>{method.icon}</span>
+                                                <span>{method.label}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={onCancel} className="flex-1">
+                                Cancel
+                            </Button>
+                            <Button 
+                                onClick={handleProceedToPayment}
+                                className="flex-1 mobile-button text-white"
+                                disabled={!paymentMethod}
+                            >
+                                Continue
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 2: Enter UPI Details */}
+                {step === 2 && (
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Tasker's UPI ID</Label>
+                            <Input
+                                placeholder="example@upi or 9876543210@paytm"
+                                value={upiId}
+                                onChange={(e) => setUpiId(e.target.value)}
+                                className="border-app-grey focus:ring-app-orange focus:border-app-orange"
+                            />
+                            <p className="text-xs text-app-stone">
+                                Ask the tasker for their UPI ID to make the payment
+                            </p>
+                        </div>
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                                <Smartphone className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-blue-800">
+                                    <p className="font-medium mb-1">How it works:</p>
+                                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                                        <li>Enter the tasker's UPI ID</li>
+                                        <li>Click "Open UPI App" to launch your payment app</li>
+                                        <li>Complete the payment in your UPI app</li>
+                                        <li>Return here and enter the transaction ID</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                                Back
+                            </Button>
+                            <Button 
+                                onClick={handleOpenUPI}
+                                className="flex-1 mobile-button text-white"
+                                disabled={!upiId.trim()}
+                            >
+                                <Smartphone className="w-4 h-4 mr-2" />
+                                Open UPI App
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 3: Confirm Payment */}
+                {step === 3 && (
+                    <div className="space-y-4">
+                        <div className="text-center py-4">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <CreditCard className="w-8 h-8 text-green-600" />
+                            </div>
+                            <h3 className="text-lg font-medium text-app-midnight mb-2">
+                                Payment Sent?
+                            </h3>
+                            <p className="text-sm text-app-stone">
+                                If you completed the payment in your UPI app, please enter the transaction ID below to confirm.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Transaction ID</Label>
+                            <Input
+                                placeholder="Enter UPI transaction ID"
+                                value={transactionId}
+                                onChange={(e) => setTransactionId(e.target.value)}
+                                className="border-app-grey focus:ring-app-orange focus:border-app-orange"
+                            />
+                            <p className="text-xs text-app-stone">
+                                You can find this in your UPI app's transaction history
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+                                Back
+                            </Button>
+                            <Button 
+                                onClick={handleConfirmPayment}
+                                className="flex-1 mobile-button text-white"
+                                disabled={!transactionId.trim() || processing}
+                            >
+                                {processing ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4 mr-2" />
+                                        Confirm Payment
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </motion.div>
+        </motion.div>
+    );
+}

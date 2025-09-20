@@ -1,0 +1,50 @@
+import React from "react";
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from "@/components/ui/select";
+import { ArrowUpDown } from "lucide-react";
+
+const sortOptions = [
+    { value: "newest", label: "Newest First" },
+    { value: "payment_high", label: "Price: High to Low" },
+    { value: "payment_low", label: "Price: Low to High" },
+    { value: "distance_near", label: "Distance: Nearest" },
+    { value: "distance_far", label: "Distance: Farthest" },
+    { value: "duration_short", label: "Duration: Shortest" },
+    { value: "duration_long", label: "Duration: Longest" },
+    { value: "deadline_soon", label: "Deadline: Soonest" }
+];
+
+export default function SortButton({ filters, onFilterChange }) {
+    const handleSortChange = (value) => {
+        onFilterChange(prev => ({
+            ...prev,
+            sortBy: value
+        }));
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-slate-500" />
+            <Select
+                value={filters.sortBy}
+                onValueChange={handleSortChange}
+            >
+                <SelectTrigger className="w-36 bg-white border-slate-200 rounded-xl text-sm">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {sortOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}

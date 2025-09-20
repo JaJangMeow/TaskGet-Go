@@ -1,0 +1,46 @@
+{
+  "name": "TaskApplication",
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "ID of the task being applied for"
+    },
+    "applicant_email": {
+      "type": "string",
+      "description": "Email of the user applying"
+    },
+    "applicant_name": {
+      "type": "string",
+      "description": "Name of the applicant"
+    },
+    "message": {
+      "type": "string",
+      "description": "Application message from the applicant"
+    },
+    "proposed_rate": {
+      "type": "number",
+      "description": "Proposed rate by applicant (optional)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Application status"
+    },
+    "contact_info": {
+      "type": "string",
+      "description": "Applicant contact information"
+    }
+  },
+  "required": [
+    "task_id",
+    "applicant_email",
+    "applicant_name",
+    "message"
+  ]
+}

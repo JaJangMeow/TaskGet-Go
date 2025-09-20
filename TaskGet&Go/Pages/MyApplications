@@ -1,0 +1,212 @@
+
+import React, { useState, useEffect } from "react";
+import { TaskApplication } from "@/entities/TaskApplication";
+import { Task } from "@/entities/Task";
+import { User } from "@/entities/User";
+import { format } from "date-fns";
+import {
+    Clock,
+    CheckCircle,
+    XCircle,
+    IndianRupee,
+    MapPin,
+    Calendar,
+    MessageSquare,
+    List // Added List icon for empty state
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Link, useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { Button } from '@/components/ui/button';
+
+export default function MyApplications() {
+    const [applications, setApplications] = useState([]);
+    const [tasks, setTasks] = useState({});
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        loadApplications();
+    }, []);
+
+    const loadApplications = async () => {
+        setLoading(true);
+        try {
+            const user = await User.me();
+            const applicationsData = await TaskApplication.filter(
+                { applicant_email: user.email },
+                "-created_date"
+            );
+
+            // Load task details for each application
+            const taskIds = [...new Set(applicationsData.map(app => app.task_id))];
+            const tasksData = await Promise.all(
+                taskIds.map(id => Task.filter({ id }))
+            );
+
+            const tasksMap = {};
+            tasksData.forEach(taskArray => {
+                if (taskArray.length > 0) {
+                    tasksMap[taskArray[0].id] = taskArray[0];
+                }
+            });
+
+            setApplications(applicationsData);
+            setTasks(tasksMap);
+        } catch (error) {
+            console.error("Error loading applications:", error);
+        }
+        setLoading(false);
+    };
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case "pending":
+                return <Clock className="w-4 h-4 text-yellow-600" />;
+            case "accepted":
+                return <CheckCircle className="w-4 h-4 text-green-600" />;
+            case "rejected":
+                return <XCircle className="w-4 h-4 text-red-600" />;
+            default:
+                return <Clock className="w-4 h-4 text-gray-600" />;
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "pending":
+                return "bg-yellow-100 text-yellow-800 border-yellow-200";
+            case "accepted":
+                return "bg-green-100 text-green-800 border-green-200";
+            case "rejected":
+                return "bg-red-100 text-red-800 border-red-200";
+            default:
+                return "bg-gray-100 text-gray-800 border-gray-200";
+        }
+    };
+
+    const openChat = (task, application) => {
+        // The recipient is the person who posted the task
+        const recipientEmail = task.created_by;
+        // We need the task poster's name. Let's assume we don't have it, so we'll pass a generic name.
+        // A better implementation would fetch the poster's user object.
+        const recipientName = 'Task Poster'; 
+        navigate(createPageUrl(`Chat?task_id=${task.id}&recipient_email=${recipientEmail}&recipient_name=${encodeURIComponent(recipientName)}`));
+    };
+
+    if (loading) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <div className="animate-pulse space-y-6">
+                    <div className="h-8 bg-slate-200 rounded w-1/3"></div>
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="material-card p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="h-6 bg-slate-200 rounded w-1/2"></div>
+                                <div className="h-6 bg-slate-200 rounded w-20"></div>
+                            </div>
+                            <div className="space-y-2 mb-4">
+                                <div className="h-4 bg-slate-200 rounded"></div>
+                                <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-bold text-app-midnight">My Applications</h1>
+                <p className="text-app-stone mt-1">
+                    Track the status of tasks you've applied for.
+                </p>
+            </div>
+
+            {/* Applications List */}
+            {applications.length === 0 ? (
+                <div className="mobile-card p-8 text-center">
+                    <div className="w-16 h-16 bg-app-grey/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <List className="w-8 h-8 text-app-stone" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-app-midnight">No applications yet</h3>
+                    <p className="text-app-stone text-sm mb-4">
+                        Browse available tasks and apply to start earning.
+                    </p>
+                    <Link
+                        to={createPageUrl("Dashboard")}
+                        className="mobile-button inline-flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium"
+                    >
+                        Browse Tasks
+                    </Link>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {applications.map((application) => {
+                        const task = tasks[application.task_id];
+                        if (!task) return null;
+
+                        return (
+                            <div key={application.id} className="mobile-card">
+                                <div className="p-4">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <Link
+                                                to={createPageUrl(`TaskDetail?id=${task.id}`)}
+                                                className="font-semibold text-app-midnight hover:text-app-orange transition-colors"
+                                            >
+                                                {task.title}
+                                            </Link>
+                                            <div className="flex items-center gap-2 text-xs text-app-stone mt-1">
+                                                <MapPin className="w-3 h-3" />
+                                                <span className="truncate">{task.location}</span>
+                                            </div>
+                                        </div>
+                                        <Badge
+                                            variant="secondary"
+                                            className={`${getStatusColor(application.status)} font-medium`}
+                                        >
+                                            {getStatusIcon(application.status)}
+                                            <span className="ml-1 capitalize">{application.status}</span>
+                                        </Badge>
+                                    </div>
+
+                                    <div className="bg-app-silver/30 p-3 rounded-lg my-3">
+                                        <p className="text-sm text-app-midnight italic">
+                                            "{application.message}"
+                                        </p>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={() => openChat(task, application)}
+                                            variant="outline"
+                                            className="flex-1 border-app-orange text-app-orange hover:bg-app-orange/10"
+                                        >
+                                            <MessageSquare className="w-4 h-4 mr-2" />
+                                            Chat
+                                        </Button>
+
+                                        {application.status === "accepted" && (
+                                            <Button
+                                                onClick={() => openChat(task, application)}
+                                                className="flex-1 mobile-button text-white"
+                                            >
+                                                Go to Task
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}

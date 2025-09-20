@@ -1,0 +1,166 @@
+{
+  "name": "Task",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Task title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the task"
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "General",
+          "Home",
+          "Office",
+          "Bazar",
+          "Delivery",
+          "Cleaning",
+          "PickUp"
+        ]
+      },
+      "maxItems": 2,
+      "description": "Task categories (up to 2)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium",
+      "description": "Task priority level"
+    },
+    "payment_amount": {
+      "type": "number",
+      "description": "Payment amount in INR"
+    },
+    "negotiable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether payment is negotiable"
+    },
+    "location": {
+      "type": "string",
+      "description": "Task location address"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude of the task location"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude of the task location"
+    },
+    "timeline": {
+      "type": "string",
+      "description": "Task timeline (optional)"
+    },
+    "estimated_duration": {
+      "type": "string",
+      "description": "Estimated time to complete"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date",
+      "description": "Task deadline"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "description": "Task images URLs (up to 4)"
+    },
+    "video": {
+      "type": "string",
+      "description": "Task video URL (optional)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "in_progress",
+        "completed",
+        "cancelled",
+        "awaiting_verification",
+        "payment_pending"
+      ],
+      "default": "open",
+      "description": "Task status"
+    },
+    "contact_info": {
+      "type": "string",
+      "description": "Contact information for the task poster"
+    },
+    "accepted_applicant_email": {
+      "type": "string",
+      "description": "Email of the accepted applicant"
+    },
+    "accepted_applicant_name": {
+      "type": "string",
+      "description": "Name of the accepted applicant"
+    },
+    "completion_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5,
+      "description": "Task completion proof images (up to 5)"
+    },
+    "completion_notes": {
+      "type": "string",
+      "description": "Tasker's notes about task completion"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the task was marked as completed by tasker"
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the task completion was verified by poster"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Payment status"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "gpay",
+        "paytm",
+        "phonepe",
+        "upi"
+      ],
+      "description": "Selected UPI payment method"
+    },
+    "payment_reference": {
+      "type": "string",
+      "description": "UPI transaction reference ID"
+    }
+  },
+  "required": [
+    "title",
+    "description",
+    "categories",
+    "payment_amount",
+    "location"
+  ]
+}

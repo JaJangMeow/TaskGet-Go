@@ -1,0 +1,248 @@
+import React, { useState, useEffect } from "react";
+import { User } from "@/entities/User";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { 
+    User as UserIcon, 
+    Mail, 
+    Calendar, 
+    Briefcase,
+    Star,
+    MapPin,
+    Phone,
+    LogOut
+} from "lucide-react";
+import { format } from "date-fns";
+
+export default function Profile() {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadProfile();
+    }, []);
+
+    const loadProfile = async () => {
+        setLoading(true);
+        try {
+            const userData = await User.me();
+            setUser(userData);
+        } catch (error) {
+            console.error("Error loading profile:", error);
+        }
+        setLoading(false);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await User.logout();
+        } catch (error) {
+            console.error("Error logging out:", error);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <div className="material-card p-8 animate-pulse">
+                    <div className="flex items-center gap-6 mb-8">
+                        <div className="w-20 h-20 bg-slate-200 rounded-full"></div>
+                        <div className="space-y-2">
+                            <div className="h-6 bg-slate-200 rounded w-48"></div>
+                            <div className="h-4 bg-slate-200 rounded w-32"></div>
+                        </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-4 bg-slate-200 rounded"></div>
+                            ))}
+                        </div>
+                        <div className="space-y-4">
+                            {[...Array(4)].map((_, i) => (
+                                <div key={i} className="h-4 bg-slate-200 rounded"></div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!user) {
+        return (
+            <div className="max-w-2xl mx-auto text-center">
+                <div className="material-card p-8">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <UserIcon className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-4">
+                        Login Required
+                    </h2>
+                    <p className="text-slate-600 mb-6">
+                        Please login to view your profile.
+                    </p>
+                    <Button
+                        onClick={() => User.login()}
+                        className="bg-blue-600 hover:bg-blue-700"
+                    >
+                        Login
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8">
+            {/* Header */}
+            <div>
+                <h1 className="text-3xl font-bold text-slate-900">Profile</h1>
+                <p className="text-slate-600 mt-2">
+                    Manage your TaskConnect profile and account settings
+                </p>
+            </div>
+
+            {/* Main Profile Card */}
+            <Card className="material-card">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center">
+                                <span className="text-2xl font-bold text-white">
+                                    {user.full_name?.charAt(0)?.toUpperCase() || "U"}
+                                </span>
+                            </div>
+                            <div>
+                                <CardTitle className="text-2xl text-slate-900">
+                                    {user.full_name || "User"}
+                                </CardTitle>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <Badge 
+                                        variant="secondary" 
+                                        className={user.role === "admin" ? 
+                                            "bg-purple-100 text-purple-800 border-purple-200" : 
+                                            "bg-blue-100 text-blue-800 border-blue-200"
+                                        }
+                                    >
+                                        {user.role === "admin" ? "Admin" : "User"}
+                                    </Badge>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        <Star className="w-3 h-3 mr-1" />
+                                        Verified
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={handleLogout}
+                            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                        >
+                            <LogOut className="w-4 h-4 mr-2" />
+                            Logout
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* Account Details */}
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                                    Account Details
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                                        <Mail className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm text-slate-600">Email</p>
+                                            <p className="font-medium text-slate-900">{user.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                                        <Calendar className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm text-slate-600">Member Since</p>
+                                            <p className="font-medium text-slate-900">
+                                                {format(new Date(user.created_date), "MMMM d, yyyy")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                                        <UserIcon className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm text-slate-600">Full Name</p>
+                                            <p className="font-medium text-slate-900">{user.full_name}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Activity Summary */}
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                                    Activity Summary
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <Briefcase className="w-5 h-5 text-blue-600" />
+                                            <span className="font-medium text-blue-900">Tasks Posted</span>
+                                        </div>
+                                        <p className="text-2xl font-bold text-blue-900">0</p>
+                                        <p className="text-sm text-blue-700">Total tasks you've created</p>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <Star className="w-5 h-5 text-green-600" />
+                                            <span className="font-medium text-green-900">Tasks Completed</span>
+                                        </div>
+                                        <p className="text-2xl font-bold text-green-900">0</p>
+                                        <p className="text-sm text-green-700">Tasks you've successfully completed</p>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <Star className="w-5 h-5 text-purple-600" />
+                                            <span className="font-medium text-purple-900">Rating</span>
+                                        </div>
+                                        <p className="text-2xl font-bold text-purple-900">5.0</p>
+                                        <p className="text-sm text-purple-700">Average rating from completed tasks</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tips Section */}
+                    <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-teal-50 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-slate-900 mb-3">💡 Getting Started Tips</h4>
+                        <ul className="space-y-2 text-sm text-slate-700">
+                            <li className="flex items-start gap-2">
+                                <span className="text-blue-600">•</span>
+                                <span>Complete your profile with contact information to increase trust</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-blue-600">•</span>
+                                <span>Post detailed task descriptions to attract the right helpers</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-blue-600">•</span>
+                                <span>Browse and apply for tasks in your area to start earning</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-blue-600">•</span>
+                                <span>UPI payments are processed securely through the platform</span>
+                            </li>
+                        </ul>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}

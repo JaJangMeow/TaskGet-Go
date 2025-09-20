@@ -1,0 +1,64 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Check, X, User, MessageSquare, IndianRupee } from 'lucide-react';
+import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+
+export default function ApplicantCard({ application, onAccept, onDecline, task }) {
+    const navigate = useNavigate();
+
+    const startChat = () => {
+        navigate(createPageUrl(`Chat?task_id=${task.id}&recipient_email=${application.applicant_email}&recipient_name=${encodeURIComponent(application.applicant_name)}`));
+    };
+
+    return (
+        <div className="mobile-card p-4">
+            <div className="flex items-start justify-between">
+                <div>
+                    <p className="font-bold text-app-midnight">{application.applicant_name}</p>
+                    <p className="text-xs text-app-stone">Applied on {format(new Date(application.created_date), 'MMM d')}</p>
+                </div>
+                <p className="text-sm font-semibold text-green-600">
+                    <IndianRupee className="inline w-3 h-3" />
+                    {application.proposed_rate}
+                </p>
+            </div>
+
+            <div className="bg-app-silver/30 p-3 rounded-lg my-3">
+                <p className="text-sm text-app-midnight italic">"{application.message}"</p>
+            </div>
+            
+            <div className="flex items-center gap-2 mb-3">
+                <p className="text-xs text-app-stone flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    Contact: {application.contact_info}
+                </p>
+            </div>
+
+            <div className="flex gap-2">
+                <Button 
+                    onClick={startChat}
+                    variant="outline" 
+                    className="flex-1 bg-white border-app-orange text-app-orange hover:bg-app-orange/10"
+                >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Chat
+                </Button>
+                <Button 
+                    onClick={() => onDecline(application.id)} 
+                    variant="outline" 
+                    className="bg-white"
+                >
+                    <X className="w-4 h-4" />
+                </Button>
+                <Button 
+                    onClick={() => onAccept(application)} 
+                    className="mobile-button"
+                >
+                    <Check className="w-4 h-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}

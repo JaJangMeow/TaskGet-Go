@@ -1,0 +1,159 @@
+import React, { useState, useEffect } from 'react';
+import { ChatMessage } from '@/entities/ChatMessage';
+import { Task } from '@/entities/Task';
+import { User } from '@/entities/User';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { format, formatDistanceToNow } from 'date-fns';
+import { MessageSquare, Users } from 'lucide-react';
+import _ from 'lodash';
+
+const ConversationItem = ({ convo, currentUser }) => {
+    const { task, lastMessage, otherParticipant } = convo;
+    const isLastMessageFromMe = lastMessage.sender_email === currentUser.email;
+
+    return (
+        <Link 
+            to={createPageUrl(`Chat?task_id=${task.id}&recipient_email=${otherParticipant.email}&recipient_name=${encodeURIComponent(otherParticipant.name)}`)}
+            className="mobile-card flex items-start gap-4 p-4"
+        >
+            <div className="w-12 h-12 bg-app-orange/20 rounded-full flex-shrink-0 flex items-center justify-center">
+                 <span className="text-xl font-bold text-app-orange">
+                    {otherParticipant.name?.charAt(0).toUpperCase() || '?'}
+                </span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+                <div className="flex justify-between items-baseline">
+                    <p className="font-semibold text-app-midnight truncate">
+                        {otherParticipant.name}
+                    </p>
+                    <p className="text-xs text-app-stone flex-shrink-0 ml-2">
+                        {formatDistanceToNow(new Date(lastMessage.created_date), { addSuffix: true })}
+                    </p>
+                </div>
+                <p className="text-sm text-app-stone truncate mb-1">
+                    Task: {task.title}
+                </p>
+                <p className="text-sm text-app-midnight truncate">
+                    {isLastMessageFromMe ? 'You: ' : ''}{lastMessage.message_type === 'image' ? '📷 Image' : lastMessage.message}
+                </p>
+            </div>
+        </Link>
+    );
+};
+
+export default function ChatList() {
+    const [conversations, setConversations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const user = await User.me();
+                setCurrentUser(user);
+
+                // Fetch all messages where the user is sender or receiver
+                const sentMessages = await ChatMessage.filter({ sender_email: user.email });
+                const receivedMessages = await ChatMessage.filter({ receiver_email: user.email });
+                const allMessages = _.uniqBy([...sentMessages, ...receivedMessages], 'id');
+
+                if (allMessages.length === 0) {
+                    setConversations([]);
+                    setLoading(false);
+                    return;
+                }
+                
+                // Group messages by conversation (task_id + other participant)
+                const groupedByConversation = _.groupBy(allMessages, msg => {
+                    const otherEmail = msg.sender_email === user.email ? msg.receiver_email : msg.sender_email;
+                    return `${msg.task_id}|${otherEmail}`;
+                });
+
+                // Fetch all unique task and user details
+                const taskIds = _.uniq(allMessages.map(m => m.task_id));
+                const userEmails = _.uniq(allMessages.flatMap(m => [m.sender_email, m.receiver_email]));
+                
+                const [tasksData, usersData] = await Promise.all([
+                    Task.filter({ id: { $in: taskIds } }),
+                    User.filter({ email: { $in: userEmails } })
+                ]);
+                
+                const tasksMap = _.keyBy(tasksData, 'id');
+                const usersMap = _.keyBy(usersData, 'email');
+
+                const convos = Object.values(groupedByConversation)
+                    .map(messages => {
+                        const lastMessage = _.maxBy(messages, 'created_date');
+                        const task = tasksMap[lastMessage.task_id];
+                        const otherUserEmail = lastMessage.sender_email === user.email ? lastMessage.receiver_email : lastMessage.sender_email;
+                        const otherUser = usersMap[otherUserEmail];
+
+                        if (!task || !otherUser) {
+                            return null;
+                        }
+
+                        return {
+                            id: `${task.id}-${otherUser.email}`,
+                            task,
+                            lastMessage,
+                            otherParticipant: {
+                                email: otherUser.email,
+                                name: otherUser.full_name || 'Unknown User'
+                            }
+                        };
+                    })
+                    .filter(Boolean); // Remove nulls if task or user not found
+
+                // Sort conversations by the last message date
+                const sortedConvos = _.orderBy(convos, convo => new Date(convo.lastMessage.created_date), 'desc');
+
+                setConversations(sortedConvos);
+
+            } catch (error) {
+                console.error("Error loading chat list:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    return (
+        <div className="space-y-6">
+            <h1 className="text-2xl font-bold text-app-midnight">Chats</h1>
+
+            {loading ? (
+                <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                        <div key={i} className="mobile-card flex items-center gap-4 p-4 animate-pulse">
+                            <div className="w-12 h-12 bg-app-grey rounded-full"></div>
+                            <div className="flex-1 space-y-2">
+                                <div className="h-4 bg-app-grey rounded w-3/4"></div>
+                                <div className="h-3 bg-app-grey rounded w-1/2"></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : conversations.length > 0 ? (
+                <div className="space-y-3">
+                    {conversations.map(convo => (
+                        <ConversationItem key={convo.id} convo={convo} currentUser={currentUser} />
+                    ))}
+                </div>
+            ) : (
+                <div className="mobile-card p-8 text-center">
+                     <div className="w-16 h-16 bg-app-grey/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <MessageSquare className="w-8 h-8 text-app-stone" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-app-midnight">No chats yet</h3>
+                    <p className="text-app-stone text-sm">
+                        Start a conversation by applying for a task or receiving an application.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
